@@ -1,0 +1,131 @@
+WEBSITE OUTLINE
+Candidates Central Database – Guild of Students Contingent Presidential Elections
+
+1️⃣ HOME PAGE
+🔹 Banner/Header
+Full-width banner featuring:
+
+Guild Elections office logo or
+
+Image of the current Guild Elections office (GEO) (clean, professional group photo)
+
+Title overlay:
+“Guild of Students Contingent Presidential Elections 2026”
+
+Optional tagline:
+Transparency. Leadership. Representation.
+
+🔹 Welcome Section
+Short paragraph explaining:
+
+Purpose of the site
+
+How residents can use it
+
+Encouragement to review campaign materials before voting
+
+🔹 Quick Navigation Buttons (Optional but recommended)
+
+View Candidates
+
+Electoral Code
+
+2️⃣ NAVIGATION BAR (Top Menu with Drop-Downs)
+🔽 Campaign Material (Main Drop-Down)
+Under this tab:
+
+➤ Position 
+For example:
+
+President
+
+
+Inside Each Position Page
+Structure:
+
+🏷 Position Title at Top
+Example:
+President – Candidate
+
+For Each Candidate (Structured Profile Card Layout)
+Each candidate should have:
+
+📸 Headshot (professional, uniform size across candidates)
+
+👤 Full Name
+
+📄 Campaign Manifesto (PDF download or embedded viewer)
+
+🎥 Campaign Video (embedded)
+
+📢 Key Points / Platform Summary (bullet format)
+
+📬 Optional contact/social links (if approved)
+
+⚠️ Important Design Note:
+
+Keep layout identical for all candidates to ensure fairness.
+
+Alphabetical order by surname (recommended for neutrality).
+
+
+3️⃣ ELECTORAL CODE (Separate Navigation Tab)
+Layout:
+Clean document viewer or downloadable PDF
+
+Sectioned by:
+
+CHAPTER I: THE CODE
+
+CHAPTER II: THE GOVERNANCE OF THE ELECTORAL PROCESS
+
+CHAPTER III: THE ANNUAL GENERAL ELECTION
+
+CHAPTER IV: RULES GOVERNING CANDIDACY
+
+CHAPTER V: RULES GOVERNING CAMPAIGNING PERIOD
+
+CHAPTER VI: ELECTION CONTROVERSIES
+
+CHAPTER VII: MISCELLANEOUS
+
+CHAPTER VIII: CONDUCT OF INVOLVED PARTIES DURING THE ELECTORAL PROCESS
+
+Search function (if possible)
+
+Highlight relevant election clauses (optional)
+
+4️⃣ OPTIONAL BUT STRONGLY RECOMMENDED ADDITIONS
+🔹 Important Dates Section
+Nomination Period
+
+Campaign Period
+
+Debate Night
+
+Election Day
+
+🔹 FAQ Section
+Who can vote?
+
+How to vote?
+
+Eligibility requirements?
+
+What happens if there’s a tie?
+
+🔹 Suggestion / Feedback Box
+Optional anonymous submission form.
+
+🎨 DESIGN GUIDELINES
+Clean, neutral color scheme (GEO colors Red, Yellow and white)
+
+Mobile responsive
+
+Minimal clutter
+
+Equal visibility for all candidates
+
+Easy PDF and video embedding
+
+Simple navigation (max 3 clicks to reach any candidate)
