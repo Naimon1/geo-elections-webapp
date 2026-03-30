@@ -9,8 +9,8 @@ import { Lock } from "lucide-react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Guild of Students Contingent Presidential Elections 2026",
-  description: "Transparency. Integrity. Progress.",
+  title: "Guild Elections Office | UWI Cave Hill",
+  description: "The official portal of the Guild Elections Office — elections, candidates, documents, and institutional records for the Guild of Students, UWI Cave Hill Campus.",
 };
 
 export default function RootLayout({

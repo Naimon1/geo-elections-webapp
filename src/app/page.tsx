@@ -1,11 +1,22 @@
-import { getImportantDates, getFAQs } from "@/lib/googleSheets";
+import { getImportantDates, getFAQs, getActiveElection, getAnnouncements } from "@/lib/googleSheets";
 import HomeClient from "@/components/HomeClient";
 
-export const revalidate = 60; // Revalidate every minute
+export const revalidate = 60;
 
 export default async function Home() {
-  const dates = await getImportantDates();
-  const faqs = await getFAQs();
+  const [dates, faqs, activeElection, announcements] = await Promise.all([
+    getImportantDates(),
+    getFAQs(),
+    getActiveElection(),
+    getAnnouncements(),
+  ]);
 
-  return <HomeClient dates={dates} faqs={faqs} />;
+  return (
+    <HomeClient
+      dates={dates}
+      faqs={faqs}
+      activeElection={activeElection}
+      announcements={announcements}
+    />
+  );
 }

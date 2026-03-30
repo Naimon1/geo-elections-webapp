@@ -5,12 +5,39 @@ import { useState } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+interface NavDropdown {
+  label: string;
+  items: { label: string; href: string }[];
+}
+
+const navLinks: (NavDropdown | { label: string; href: string })[] = [
+  { label: 'Home', href: '/' },
+  {
+    label: 'Elections',
+    items: [
+      { label: 'Current Election', href: '/elections' },
+      { label: 'Election Archive', href: '/elections/archive' },
+    ],
+  },
+  {
+    label: 'Candidates',
+    items: [
+      { label: 'Presidential Candidates', href: '/candidates/president' },
+    ],
+  },
+  { label: 'Documents & Notices', href: '/documents' },
+  { label: 'Councilor Roles', href: '/councilor-roles' },
+  { label: 'Records', href: '/records' },
+  { label: 'About GEO', href: '/about' },
+];
+
+function isDropdown(item: (typeof navLinks)[number]): item is NavDropdown {
+  return 'items' in item;
+}
+
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  // Hardcoded positions for now, could be fetched from API
-  const positions = ['President'];
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   return (
     <nav className="glass-dark text-white sticky top-0 z-50">
@@ -24,56 +51,59 @@ export function Navbar() {
           </div>
 
           {/* Desktop Menu */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
-            <Link href="/" className="text-sm font-medium hover:text-guild-yellow transition-colors relative group">
-              Home
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-guild-yellow transition-all group-hover:w-full"></span>
-            </Link>
-            
-            <div className="relative">
-              <button 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
-                className="flex items-center text-sm font-medium hover:text-guild-yellow transition-colors group"
-              >
-                Campaign Material 
-                <ChevronDown className={`ml-1 w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              
-              <AnimatePresence>
-                {isDropdownOpen && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute left-0 mt-4 w-48 rounded-xl shadow-2xl glass ring-1 ring-black ring-opacity-5 overflow-hidden"
+          <div className="hidden lg:flex lg:items-center lg:space-x-6">
+            {navLinks.map((item) =>
+              isDropdown(item) ? (
+                <div key={item.label} className="relative">
+                  <button
+                    onClick={() => setOpenDropdown(openDropdown === item.label ? null : item.label)}
+                    onBlur={() => setTimeout(() => setOpenDropdown(null), 200)}
+                    className="flex items-center text-sm font-medium hover:text-guild-yellow transition-colors group"
                   >
-                    <div className="py-2" role="menu">
-                      {positions.map((position) => (
-                        <Link
-                          key={position}
-                          href={`/candidates/${encodeURIComponent(position.toLowerCase())}`}
-                          className="block px-4 py-2.5 text-sm text-gray-800 hover:bg-guild-red/10 hover:text-guild-red transition-colors font-medium"
-                          role="menuitem"
-                        >
-                          {position}
-                        </Link>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                    {item.label}
+                    <ChevronDown className={`ml-1 w-4 h-4 transition-transform duration-200 ${openDropdown === item.label ? 'rotate-180' : ''}`} />
+                  </button>
 
-            <Link href="/electoral-code" className="text-sm font-medium hover:text-guild-yellow transition-colors relative group">
-              Electoral Code
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-guild-yellow transition-all group-hover:w-full"></span>
-            </Link>
+                  <AnimatePresence>
+                    {openDropdown === item.label && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute left-0 mt-4 w-52 rounded-xl shadow-2xl glass ring-1 ring-black ring-opacity-5 overflow-hidden"
+                      >
+                        <div className="py-2" role="menu">
+                          {item.items.map((sub) => (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              className="block px-4 py-2.5 text-sm text-gray-800 hover:bg-guild-red/10 hover:text-guild-red transition-colors font-medium"
+                              role="menuitem"
+                            >
+                              {sub.label}
+                            </Link>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm font-medium hover:text-guild-yellow transition-colors relative group"
+                >
+                  {item.label}
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-guild-yellow transition-all group-hover:w-full"></span>
+                </Link>
+              )
+            )}
           </div>
 
           {/* Mobile menu button */}
-          <div className="flex items-center md:hidden">
+          <div className="flex items-center lg:hidden">
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md hover:text-guild-yellow hover:bg-white/10 focus:outline-none transition-colors"
@@ -87,33 +117,41 @@ export function Navbar() {
       {/* Mobile Menu */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden glass-dark border-t border-white/10"
+            className="lg:hidden glass-dark border-t border-white/10"
           >
-            <div className="px-4 pt-2 pb-4 space-y-1 sm:px-3">
-              <Link href="/" className="block px-3 py-2.5 rounded-lg text-base font-medium hover:text-guild-yellow hover:bg-white/5 transition-colors">
-                Home
-              </Link>
-              <div className="px-3 py-2.5 text-base font-medium text-white/90">
-                Campaign Material
-                <div className="mt-2 space-y-1 pl-4 border-l-2 border-guild-red/50">
-                  {positions.map((position) => (
-                    <Link
-                      key={position}
-                      href={`/candidates/${encodeURIComponent(position.toLowerCase())}`}
-                      className="block px-3 py-2 rounded-lg text-sm hover:text-guild-yellow hover:bg-white/5 transition-colors"
-                    >
-                      {position}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <Link href="/electoral-code" className="block px-3 py-2.5 rounded-lg text-base font-medium hover:text-guild-yellow hover:bg-white/5 transition-colors">
-                Electoral Code
-              </Link>
+            <div className="px-4 pt-2 pb-4 space-y-1 sm:px-3 max-h-[80vh] overflow-y-auto">
+              {navLinks.map((item) =>
+                isDropdown(item) ? (
+                  <div key={item.label} className="px-3 py-2.5 text-base font-medium text-white/90">
+                    {item.label}
+                    <div className="mt-2 space-y-1 pl-4 border-l-2 border-guild-red/50">
+                      {item.items.map((sub) => (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          onClick={() => setIsOpen(false)}
+                          className="block px-3 py-2 rounded-lg text-sm hover:text-guild-yellow hover:bg-white/5 transition-colors"
+                        >
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className="block px-3 py-2.5 rounded-lg text-base font-medium hover:text-guild-yellow hover:bg-white/5 transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                )
+              )}
             </div>
           </motion.div>
         )}
