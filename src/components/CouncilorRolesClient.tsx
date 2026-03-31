@@ -183,7 +183,7 @@ export default function CouncilorRolesClient({
           transition={{ duration: 0.7 }}
           className="text-center mb-16"
         >
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
             Guild Councilor Roles
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full mt-6 mb-6" />

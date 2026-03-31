@@ -5,10 +5,13 @@ import { motion } from "framer-motion";
 import {
   Trophy,
   Users,
-  BarChart3,
   Crown,
   ArrowLeft,
   Archive,
+  Gavel,
+  Calendar,
+  XCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { PastElectionResult } from "@/lib/googleSheets";
 
@@ -25,72 +28,65 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
 };
 
-interface YearGroup {
-  year: string;
-  voterTurnout: string;
-  totalEligible: string;
-  positions: {
-    position: string;
-    candidates: PastElectionResult[];
-  }[];
+interface PositionGroup {
+  position: string;
+  rejectedBallots: string;
+  totalVotesCast: string;
+  ron: string;
+  candidates: PastElectionResult[];
 }
 
-function groupByYear(results: PastElectionResult[]): YearGroup[] {
+interface ElectionGroup {
+  year: string;
+  month: string;
+  day: string;
+  returningOfficer: string;
+  positions: PositionGroup[];
+}
+
+function groupResults(results: PastElectionResult[]): ElectionGroup[] {
   const yearMap = new Map<string, PastElectionResult[]>();
 
   for (const r of results) {
-    const existing = yearMap.get(r.year) || [];
+    const key = r.year;
+    const existing = yearMap.get(key) || [];
     existing.push(r);
-    yearMap.set(r.year, existing);
+    yearMap.set(key, existing);
   }
 
   return Array.from(yearMap.entries())
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([year, candidates]) => {
-      const positionMap = new Map<string, PastElectionResult[]>();
-      for (const c of candidates) {
-        const existing = positionMap.get(c.position) || [];
-        existing.push(c);
-        positionMap.set(c.position, existing);
-      }
+    .map(([year, entries]) => {
+      const first = entries[0];
 
-      const first = candidates[0];
+      const positionMap = new Map<string, PastElectionResult[]>();
+      for (const e of entries) {
+        const existing = positionMap.get(e.position) || [];
+        existing.push(e);
+        positionMap.set(e.position, existing);
+      }
 
       return {
         year,
-        voterTurnout: first?.voterTurnout || "",
-        totalEligible: first?.totalEligible || "",
-        positions: Array.from(positionMap.entries()).map(
-          ([position, cands]) => ({
+        month: first?.month || "",
+        day: first?.day || "",
+        returningOfficer: first?.returningOfficer || "",
+        positions: Array.from(positionMap.entries()).map(([position, cands]) => {
+          const posFirst = cands[0];
+          return {
             position,
+            rejectedBallots: posFirst?.rejectedBallots || "",
+            totalVotesCast: posFirst?.totalVotesCast || "",
+            ron: posFirst?.ron || "",
             candidates: cands.sort((a, b) => {
-              if (a.isWinner !== b.isWinner) return a.isWinner ? -1 : 1;
+              if (a.outcome === "Winner" && b.outcome !== "Winner") return -1;
+              if (a.outcome !== "Winner" && b.outcome === "Winner") return 1;
               return parseInt(b.votes || "0") - parseInt(a.votes || "0");
             }),
-          })
-        ),
+          };
+        }),
       };
     });
-}
-
-function TurnoutBar({ turnout }: { turnout: string }) {
-  const pct = parseFloat(turnout) || 0;
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-3 bg-gray-800 rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          whileInView={{ width: `${Math.min(pct, 100)}%` }}
-          viewport={{ once: true }}
-          transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
-          className="h-full bg-gradient-to-r from-guild-yellow to-yellow-500 rounded-full"
-        />
-      </div>
-      <span className="text-guild-yellow font-bold font-mono text-sm w-14 text-right">
-        {pct > 0 ? `${pct}%` : "N/A"}
-      </span>
-    </div>
-  );
 }
 
 interface ArchiveClientProps {
@@ -98,19 +94,18 @@ interface ArchiveClientProps {
 }
 
 export default function ArchiveClient({ results }: ArchiveClientProps) {
-  const groups = groupByYear(results);
+  const groups = groupResults(results);
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 relative z-10">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-4 tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white mb-4 tracking-tight font-serif">
             Election <span className="text-guild-yellow">Archive</span>
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full mb-6" />
@@ -155,7 +150,7 @@ export default function ArchiveClient({ results }: ArchiveClientProps) {
                 variants={itemVariants}
                 className="glass-dark rounded-2xl overflow-hidden shadow-xl"
               >
-                {/* Year Header */}
+                {/* Election Header */}
                 <div className="bg-gradient-to-r from-guild-red/30 to-transparent px-8 py-6 border-b border-white/10">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -166,74 +161,93 @@ export default function ArchiveClient({ results }: ArchiveClientProps) {
                         <h2 className="text-3xl font-extrabold text-white font-serif">
                           {group.year}
                         </h2>
-                        {group.totalEligible && (
+                        {(group.day || group.month) && (
                           <p className="text-sm text-gray-400 flex items-center gap-1.5 mt-0.5">
-                            <Users className="w-3.5 h-3.5" />
-                            {group.totalEligible} eligible voters
+                            <Calendar className="w-3.5 h-3.5" />
+                            {group.day && `${group.day} `}{group.month} {group.year}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    {group.voterTurnout && (
-                      <div className="sm:w-64">
-                        <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
-                          <BarChart3 className="w-3.5 h-3.5" />
-                          Voter Turnout
-                        </p>
-                        <TurnoutBar turnout={group.voterTurnout} />
+                    {group.returningOfficer && (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10">
+                        <Gavel className="w-4 h-4 text-guild-yellow shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase tracking-wider font-bold">Returning Officer</p>
+                          <p className="text-white font-semibold text-sm">{group.returningOfficer}</p>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Positions */}
-                <div className="p-8 space-y-8">
+                <div className="p-8 space-y-10">
                   {group.positions.map((pos) => (
                     <div key={pos.position}>
-                      <h3 className="text-lg font-bold text-guild-yellow uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <span className="w-1.5 h-6 bg-guild-yellow rounded-full" />
-                        {pos.position}
-                      </h3>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                        <h3 className="text-lg font-bold text-guild-yellow uppercase tracking-wider flex items-center gap-2">
+                          <span className="w-1.5 h-6 bg-guild-yellow rounded-full" />
+                          {pos.position}
+                        </h3>
+                        <div className="flex flex-wrap gap-3 sm:gap-4 text-xs text-gray-400">
+                          {pos.totalVotesCast && (
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              <span className="font-bold text-gray-300">{pos.totalVotesCast}</span> total votes
+                            </span>
+                          )}
+                          {pos.rejectedBallots && (
+                            <span className="flex items-center gap-1">
+                              <XCircle className="w-3.5 h-3.5 text-red-400" />
+                              <span className="font-bold text-gray-300">{pos.rejectedBallots}</span> rejected
+                            </span>
+                          )}
+                          {pos.ron && (
+                            <span className="flex items-center gap-1">
+                              RON: <span className="font-bold text-gray-300">{pos.ron}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       <div className="space-y-3">
-                        {pos.candidates.map((c, idx) => (
-                          <div
-                            key={idx}
-                            className={`flex items-center justify-between rounded-xl px-5 py-4 transition-colors ${
-                              c.isWinner
-                                ? "bg-guild-yellow/10 border border-guild-yellow/30"
-                                : "bg-gray-800/50 border border-gray-700/30 hover:bg-gray-800/80"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              {c.isWinner && (
-                                <Crown className="w-5 h-5 text-guild-yellow shrink-0" />
-                              )}
-                              <span
-                                className={`font-semibold ${
-                                  c.isWinner ? "text-white" : "text-gray-300"
-                                }`}
-                              >
-                                {c.candidateName}
-                              </span>
-                              {c.isWinner && (
-                                <span className="text-xs font-bold bg-guild-yellow/20 text-guild-yellow px-2.5 py-0.5 rounded-full border border-guild-yellow/40">
-                                  Winner
-                                </span>
-                              )}
-                            </div>
-                            <span
-                              className={`font-mono font-bold text-sm ${
-                                c.isWinner
-                                  ? "text-guild-yellow"
-                                  : "text-gray-400"
+                        {pos.candidates.map((c, idx) => {
+                          const isWinner = c.outcome === "Winner";
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-xl px-4 sm:px-5 py-3 sm:py-4 gap-2 transition-colors ${
+                                isWinner
+                                  ? "bg-guild-yellow/10 border border-guild-yellow/30"
+                                  : "bg-gray-800/50 border border-gray-700/30 hover:bg-gray-800/80"
                               }`}
                             >
-                              {c.votes} votes
-                            </span>
-                          </div>
-                        ))}
+                              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                {isWinner && (
+                                  <Crown className="w-4 sm:w-5 h-4 sm:h-5 text-guild-yellow shrink-0" />
+                                )}
+                                <span className={`font-semibold text-sm sm:text-base ${isWinner ? "text-white" : "text-gray-300"}`}>
+                                  {c.candidateName}
+                                </span>
+                                {isWinner && (
+                                  <span className="text-xs font-bold bg-guild-yellow/20 text-guild-yellow px-2 py-0.5 rounded-full border border-guild-yellow/40 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> Winner
+                                  </span>
+                                )}
+                                {!isWinner && c.outcome && (
+                                  <span className="text-xs font-bold bg-gray-700/50 text-gray-400 px-2 py-0.5 rounded-full border border-gray-600/40">
+                                    {c.outcome}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`font-mono font-bold text-xs sm:text-sm shrink-0 ${isWinner ? "text-guild-yellow" : "text-gray-400"}`}>
+                                {c.votes} votes
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -243,7 +257,6 @@ export default function ArchiveClient({ results }: ArchiveClientProps) {
           </motion.div>
         )}
 
-        {/* Back link */}
         {groups.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}

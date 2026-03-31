@@ -31,15 +31,15 @@ export default function PositionClient({ candidates, position }: PositionClientP
     : position.charAt(0).toUpperCase() + position.slice(1);
 
   return (
-    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 relative z-10">
+    <div className="min-h-screen py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative z-10">
       <div className="max-w-7xl mx-auto">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-10 sm:mb-16"
         >
-          <h1 className="text-5xl font-extrabold text-white mb-4 tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight font-serif">
             {displayPosition} <span className="text-guild-red">Candidates</span>
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full"></div>
@@ -64,10 +64,10 @@ export default function PositionClient({ candidates, position }: PositionClientP
               <motion.div 
                 variants={cardVariants}
                 key={candidate.id} 
-                className="glass-dark rounded-3xl overflow-hidden flex flex-col group hover:shadow-2xl hover:shadow-guild-red/10 transition-all duration-300 transform hover:-translate-y-2"
+                className="glass-dark rounded-3xl overflow-hidden flex flex-col group hover:shadow-2xl hover:shadow-guild-red/10 transition-all duration-300 sm:hover:-translate-y-2"
               >
                 {/* Headshot */}
-                <div className="relative w-full h-96 bg-gray-900 overflow-hidden">
+                <div className="relative w-full h-72 sm:h-96 bg-gray-900 overflow-hidden">
                   {candidate.headshotUrl ? (
                     <Image
                       src={candidate.headshotUrl}

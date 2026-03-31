@@ -178,7 +178,7 @@ export default function DocumentsClient({
             height={80}
             className="mx-auto mb-6 rounded-xl shadow-lg border border-white/10"
           />
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
             Official Documents & Notices
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full mt-6 mb-4" />

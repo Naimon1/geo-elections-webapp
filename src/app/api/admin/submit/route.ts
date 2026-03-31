@@ -15,7 +15,7 @@ const VALID_TYPES = [
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { type, ...payload } = data;
+    const { type, action, ...payload } = data;
 
     if (!type || !VALID_TYPES.includes(type)) {
       return NextResponse.json(
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type,
+        action: action || 'create',
         ...payload,
         timestamp: new Date().toISOString(),
       }),

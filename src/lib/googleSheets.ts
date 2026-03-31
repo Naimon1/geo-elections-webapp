@@ -38,13 +38,17 @@ export interface Election {
 }
 
 export interface PastElectionResult {
+  returningOfficer: string;
+  day: string;
+  month: string;
   year: string;
   position: string;
   candidateName: string;
   votes: string;
-  isWinner: boolean;
-  voterTurnout: string;
-  totalEligible: string;
+  ron: string;
+  rejectedBallots: string;
+  totalVotesCast: string;
+  outcome: string;
 }
 
 export interface OfficialDocument {
@@ -188,15 +192,19 @@ export async function getActiveElection(): Promise<Election | null> {
 
 // ─── Past Election Results ───────────────────────────────────
 export async function getPastElectionResults(): Promise<PastElectionResult[]> {
-  const rows = await fetchSheetData("PastResults!A2:G");
+  const rows = await fetchSheetData("PastResults!A2:K");
   return rows.map((row: string[]) => ({
-    year: row[0] || "",
-    position: row[1] || "",
-    candidateName: row[2] || "",
-    votes: row[3] || "",
-    isWinner: (row[4] || "").toLowerCase() === "yes",
-    voterTurnout: row[5] || "",
-    totalEligible: row[6] || "",
+    returningOfficer: row[0] || "",
+    day: row[1] || "",
+    month: row[2] || "",
+    year: row[3] || "",
+    position: row[4] || "",
+    candidateName: row[5] || "",
+    votes: row[6] || "",
+    ron: row[7] || "",
+    rejectedBallots: row[8] || "",
+    totalVotesCast: row[9] || "",
+    outcome: row[10] || "",
   }));
 }
 

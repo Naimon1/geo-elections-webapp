@@ -148,7 +148,7 @@ export default function ElectionsClient({
           className="text-center mb-16"
         >
           <StatusBadge status={election.status} />
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white mt-6 mb-4 tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white mt-6 mb-4 tracking-tight font-serif">
             {election.title}
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full mb-6" />
@@ -216,12 +216,12 @@ export default function ElectionsClient({
                 dates.map((d, i) => (
                   <div
                     key={i}
-                    className="flex justify-between items-center group border-b border-gray-700/50 pb-4 last:border-0"
+                    className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 group border-b border-gray-700/50 pb-4 last:border-0"
                   >
-                    <span className="font-semibold text-gray-300 group-hover:text-white transition-colors">
+                    <span className="font-semibold text-gray-300 group-hover:text-white transition-colors text-sm sm:text-base">
                       {d.title}
                     </span>
-                    <span className="w-48 text-center font-mono text-sm tracking-tight text-guild-yellow font-bold bg-yellow-900/30 px-3 py-2 rounded-xl border border-yellow-700/50">
+                    <span className="sm:w-48 text-center font-mono text-xs sm:text-sm tracking-tight text-guild-yellow font-bold bg-yellow-900/30 px-3 py-2 rounded-xl border border-yellow-700/50 shrink-0">
                       {d.date}
                     </span>
                   </div>

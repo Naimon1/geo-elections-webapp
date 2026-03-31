@@ -253,7 +253,7 @@ export default function RecordsClient({ officials }: RecordsClientProps) {
           transition={{ duration: 0.7 }}
           className="text-center mb-14"
         >
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white tracking-tight font-serif">
             Institutional Records
           </h1>
           <div className="w-24 h-1.5 bg-gradient-to-r from-guild-red to-guild-yellow mx-auto rounded-full mt-6 mb-6" />
