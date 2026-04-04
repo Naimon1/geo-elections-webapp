@@ -10,7 +10,7 @@ import {
   Users,
   Landmark,
 } from "lucide-react";
-import { CouncilorRole } from "@/lib/googleSheets";
+import { CouncilorRole, type CouncilSeatType } from "@/lib/googleSheets";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -27,6 +27,21 @@ const itemVariants = {
 
 interface CouncilorRolesClientProps {
   roles: CouncilorRole[];
+}
+
+function RoleSeatBadge({ seat }: { seat: CouncilSeatType }) {
+  const isAppointed = seat === "appointed";
+  return (
+    <span
+      className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${
+        isAppointed
+          ? "bg-blue-500/15 text-blue-300 border-blue-500/40"
+          : "bg-guild-yellow/15 text-guild-yellow border-guild-yellow/40"
+      }`}
+    >
+      {isAppointed ? "Appointed" : "Elected"}
+    </span>
+  );
 }
 
 function BulletList({ text }: { text: string }) {
@@ -106,13 +121,16 @@ function RoleCard({ role }: { role: CouncilorRole }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-6 text-left group"
       >
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-guild-red/10 border border-guild-red/20 group-hover:bg-guild-red/20 transition-colors">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <div className="p-3 rounded-xl bg-guild-red/10 border border-guild-red/20 group-hover:bg-guild-red/20 transition-colors shrink-0">
             <Landmark className="w-6 h-6 text-guild-red" />
           </div>
-          <h3 className="text-lg font-bold text-white group-hover:text-guild-yellow transition-colors">
-            {role.position}
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+            <h3 className="text-lg font-bold text-white group-hover:text-guild-yellow transition-colors">
+              {role.position}
+            </h3>
+            {role.seatType && <RoleSeatBadge seat={role.seatType} />}
+          </div>
         </div>
         <motion.span
           animate={{ rotate: expanded ? 180 : 0 }}

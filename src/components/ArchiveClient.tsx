@@ -13,7 +13,7 @@ import {
   XCircle,
   CheckCircle2,
 } from "lucide-react";
-import { PastElectionResult } from "@/lib/googleSheets";
+import { PastElectionResult, pastElectionGroupingKey } from "@/lib/googleSheets";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -37,6 +37,7 @@ interface PositionGroup {
 }
 
 interface ElectionGroup {
+  electionName: string;
   year: string;
   month: string;
   day: string;
@@ -45,28 +46,30 @@ interface ElectionGroup {
 }
 
 function groupResults(results: PastElectionResult[]): ElectionGroup[] {
-  const yearMap = new Map<string, PastElectionResult[]>();
+  const periodMap = new Map<string, PastElectionResult[]>();
 
   for (const r of results) {
-    const key = r.year;
-    const existing = yearMap.get(key) || [];
+    const key = pastElectionGroupingKey(r);
+    const existing = periodMap.get(key) || [];
     existing.push(r);
-    yearMap.set(key, existing);
+    periodMap.set(key, existing);
   }
 
-  return Array.from(yearMap.entries())
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([year, entries]) => {
+  return Array.from(periodMap.values())
+    .map((entries) => {
       const first = entries[0];
+      const year = first?.year || "";
 
       const positionMap = new Map<string, PastElectionResult[]>();
       for (const e of entries) {
-        const existing = positionMap.get(e.position) || [];
+        const posKey = e.position;
+        const existing = positionMap.get(posKey) || [];
         existing.push(e);
-        positionMap.set(e.position, existing);
+        positionMap.set(posKey, existing);
       }
 
       return {
+        electionName: first?.electionName || "",
         year,
         month: first?.month || "",
         day: first?.day || "",
@@ -86,6 +89,11 @@ function groupResults(results: PastElectionResult[]): ElectionGroup[] {
           };
         }),
       };
+    })
+    .sort((a, b) => {
+      const y = (b.year || "").localeCompare(a.year || "");
+      if (y !== 0) return y;
+      return (b.electionName || "").localeCompare(a.electionName || "");
     });
 }
 
@@ -146,7 +154,7 @@ export default function ArchiveClient({ results }: ArchiveClientProps) {
           >
             {groups.map((group) => (
               <motion.div
-                key={group.year}
+                key={`${pastElectionGroupingKey(group)}`}
                 variants={itemVariants}
                 className="glass-dark rounded-2xl overflow-hidden shadow-xl"
               >
@@ -158,9 +166,12 @@ export default function ArchiveClient({ results }: ArchiveClientProps) {
                         <Trophy className="w-7 h-7 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-3xl font-extrabold text-white font-serif">
-                          {group.year}
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-serif">
+                          {group.electionName || group.year}
                         </h2>
+                        {group.electionName && (
+                          <p className="text-sm text-guild-yellow/90 font-semibold mt-1">{group.year}</p>
+                        )}
                         {(group.day || group.month) && (
                           <p className="text-sm text-gray-400 flex items-center gap-1.5 mt-0.5">
                             <Calendar className="w-3.5 h-3.5" />

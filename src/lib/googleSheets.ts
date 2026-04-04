@@ -38,6 +38,8 @@ export interface Election {
 }
 
 export interface PastElectionResult {
+  /** Display name for this election period (e.g. "Presidential Election 2026"). New column A in PastResults sheet. */
+  electionName: string;
   returningOfficer: string;
   day: string;
   month: string;
@@ -49,6 +51,54 @@ export interface PastElectionResult {
   rejectedBallots: string;
   totalVotesCast: string;
   outcome: string;
+}
+
+/** Stable key for grouping rows that belong to the same election period (archive + admin list). */
+export function pastElectionGroupingKey(
+  r: Pick<PastElectionResult, "electionName" | "returningOfficer" | "day" | "month" | "year">
+): string {
+  const part = (v: unknown) => (v == null ? "" : String(v)).trim();
+  return `${part(r.electionName)}|${part(r.returningOfficer)}|${part(r.day)}|${part(r.month)}|${part(r.year)}`;
+}
+
+function cell(row: unknown[], i: number): string {
+  const v = row[i];
+  if (v == null || v === "") return "";
+  return typeof v === "string" ? v : String(v);
+}
+
+function mapPastResultRow(row: unknown[]): PastElectionResult {
+  const hasNewFormat = row.length >= 12;
+  if (hasNewFormat) {
+    return {
+      electionName: cell(row, 0),
+      returningOfficer: cell(row, 1),
+      day: cell(row, 2),
+      month: cell(row, 3),
+      year: cell(row, 4),
+      position: cell(row, 5),
+      candidateName: cell(row, 6),
+      votes: cell(row, 7),
+      ron: cell(row, 8),
+      rejectedBallots: cell(row, 9),
+      totalVotesCast: cell(row, 10),
+      outcome: cell(row, 11),
+    };
+  }
+  return {
+    electionName: "",
+    returningOfficer: cell(row, 0),
+    day: cell(row, 1),
+    month: cell(row, 2),
+    year: cell(row, 3),
+    position: cell(row, 4),
+    candidateName: cell(row, 5),
+    votes: cell(row, 6),
+    ron: cell(row, 7),
+    rejectedBallots: cell(row, 8),
+    totalVotesCast: cell(row, 9),
+    outcome: cell(row, 10),
+  };
 }
 
 export interface OfficialDocument {
@@ -77,6 +127,8 @@ export interface AboutSection {
   iconName: string;
 }
 
+export type CouncilSeatType = "elected" | "appointed";
+
 export interface Official {
   id: string;
   name: string;
@@ -94,6 +146,8 @@ export interface CouncilorRole {
   additionalExpectations: string;
   candidateGuidance: string;
   order: number;
+  /** Column F in CouncilorRoles sheet: elected vs appointed for this guild position. */
+  seatType: CouncilSeatType | null;
 }
 
 export interface Announcement {
@@ -192,20 +246,8 @@ export async function getActiveElection(): Promise<Election | null> {
 
 // ─── Past Election Results ───────────────────────────────────
 export async function getPastElectionResults(): Promise<PastElectionResult[]> {
-  const rows = await fetchSheetData("PastResults!A2:K");
-  return rows.map((row: string[]) => ({
-    returningOfficer: row[0] || "",
-    day: row[1] || "",
-    month: row[2] || "",
-    year: row[3] || "",
-    position: row[4] || "",
-    candidateName: row[5] || "",
-    votes: row[6] || "",
-    ron: row[7] || "",
-    rejectedBallots: row[8] || "",
-    totalVotesCast: row[9] || "",
-    outcome: row[10] || "",
-  }));
+  const rows = await fetchSheetData("PastResults!A2:L");
+  return rows.map((row: unknown[]) => mapPastResultRow(row));
 }
 
 // ─── Official Documents ──────────────────────────────────────
@@ -248,9 +290,15 @@ export async function getAboutSections(): Promise<AboutSection[]> {
     .sort((a: AboutSection, b: AboutSection) => a.order - b.order);
 }
 
+function parseCouncilSeatType(raw: string | undefined): CouncilSeatType | null {
+  const t = (raw || "").trim().toLowerCase();
+  if (t === "elected" || t === "appointed") return t;
+  return null;
+}
+
 // ─── Officials / Records ─────────────────────────────────────
 export async function getOfficials(): Promise<Official[]> {
-  const rows = await fetchSheetData("Officials!A2:G");
+  const rows = await fetchSheetData("Officials!A2:F");
   return rows.map((row: string[], index: number) => ({
     id: `official-${index}`,
     name: row[0] || "",
@@ -264,7 +312,7 @@ export async function getOfficials(): Promise<Official[]> {
 
 // ─── Councilor Roles ─────────────────────────────────────────
 export async function getCouncilorRoles(): Promise<CouncilorRole[]> {
-  const rows = await fetchSheetData("CouncilorRoles!A2:E");
+  const rows = await fetchSheetData("CouncilorRoles!A2:F");
   return rows
     .map((row: string[], index: number) => ({
       id: `role-${index}`,
@@ -273,6 +321,7 @@ export async function getCouncilorRoles(): Promise<CouncilorRole[]> {
       additionalExpectations: row[2] || "",
       candidateGuidance: row[3] || "",
       order: parseInt(row[4] || "0", 10),
+      seatType: parseCouncilSeatType(row[5]),
     }))
     .sort((a: CouncilorRole, b: CouncilorRole) => a.order - b.order);
 }

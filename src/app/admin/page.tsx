@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { pastElectionGroupingKey, type PastElectionResult } from '@/lib/googleSheets';
 import { FileUpload } from '@/components/FileUpload';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -66,7 +67,9 @@ async function submitForm(type: string, payload: Record<string, unknown>, action
 // ─── Fetch existing data helper ─────────────────────────────
 async function fetchExistingData(dataType: string) {
   try {
-    const response = await fetch(`/api/admin/data?type=${dataType}`);
+    const response = await fetch(`/api/admin/data?type=${dataType}`, {
+      cache: 'no-store',
+    });
     if (!response.ok) return [];
     const result = await response.json();
     return result.data || [];
@@ -491,54 +494,188 @@ interface PositionEntry {
   candidates: { candidateName: string; votes: string; ron: string; outcome: string }[];
 }
 
+const defaultPositionBlock = (): PositionEntry => ({
+  position: '',
+  rejectedBallots: '',
+  totalVotesCast: '',
+  candidates: [{ candidateName: '', votes: '', ron: '', outcome: 'No Winner' }],
+});
+
+function groupPastRowsByPeriod(rows: PastElectionResult[]): Map<string, PastElectionResult[]> {
+  const m = new Map<string, PastElectionResult[]>();
+  for (const r of rows) {
+    const k = pastElectionGroupingKey(r);
+    const arr = m.get(k) || [];
+    arr.push(r);
+    m.set(k, arr);
+  }
+  return m;
+}
+
+function str(v: unknown): string {
+  if (v == null || v === '') return '';
+  return typeof v === 'string' ? v : String(v);
+}
+
+/** Coerce sheet/API values so controlled inputs never receive numbers (avoids React DOM warnings). */
+function buildPositionsFromRows(rows: PastElectionResult[]): PositionEntry[] {
+  const byPos = new Map<string, PastElectionResult[]>();
+  for (const r of rows) {
+    const key = str(r.position);
+    const arr = byPos.get(key) || [];
+    arr.push(r);
+    byPos.set(key, arr);
+  }
+  return Array.from(byPos.entries()).map(([position, cands]) => ({
+    position,
+    rejectedBallots: str(cands[0]?.rejectedBallots),
+    totalVotesCast: str(cands[0]?.totalVotesCast),
+    candidates: cands.map((c) => ({
+      candidateName: str(c.candidateName),
+      votes: str(c.votes),
+      ron: str(c.ron),
+      outcome: c.outcome === 'Winner' ? 'Winner' : 'No Winner',
+    })),
+  }));
+}
+
 function PastResultsSection() {
-  const [electionInfo, setElectionInfo] = useState({ returningOfficer: '', day: '', month: '', year: '' });
-  const [positions, setPositions] = useState<PositionEntry[]>([{
-    position: '', rejectedBallots: '', totalVotesCast: '',
-    candidates: [{ candidateName: '', votes: '', ron: '', outcome: 'No Winner' }],
-  }]);
+  const emptyElection = { electionName: '', returningOfficer: '', day: '', month: '', year: '' };
+  const [electionInfo, setElectionInfo] = useState(emptyElection);
+  const [positions, setPositions] = useState<PositionEntry[]>([defaultPositionBlock()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [editMode, setEditMode] = useState(false);
+  /** Election name (column A) as it was when Edit was opened — send to Make as `originalElectionName` to find rows to replace. */
+  const [originalElectionName, setOriginalElectionName] = useState('');
+  const [showExisting, setShowExisting] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+  const [existingGroups, setExistingGroups] = useState<
+    { key: string; label: string; subtitle: string; rows: PastElectionResult[] }[]
+  >([]);
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   const updateElection = (field: string, value: string) => {
-    setElectionInfo(prev => ({ ...prev, [field]: value }));
+    setElectionInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const loadExisting = useCallback(async () => {
+    setLoadingExisting(true);
+    const data = (await fetchExistingData('past_results')) as PastElectionResult[];
+    const byPeriod = groupPastRowsByPeriod(data);
+    const groups = Array.from(byPeriod.entries()).map(([key, rows]) => {
+      const first = rows[0];
+      const name = (first?.electionName || '').trim();
+      const label = name || `Election (${first?.year || '—'})`;
+      const subtitle = [first?.year, first?.returningOfficer].filter(Boolean).join(' · ');
+      return { key, label, subtitle, rows };
+    });
+    groups.sort((a, b) => b.label.localeCompare(a.label));
+    setExistingGroups(groups);
+    setLoadingExisting(false);
+  }, []);
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setOriginalElectionName('');
+    setElectionInfo(emptyElection);
+    setPositions([defaultPositionBlock()]);
+  };
+
+  const startEdit = (rows: PastElectionResult[] | undefined) => {
+    if (!rows?.length) return;
+    const first = rows[0];
+    const monthRaw = str(first.month);
+    const monthVal = months.includes(monthRaw) ? monthRaw : '';
+    setElectionInfo({
+      electionName: str(first.electionName),
+      returningOfficer: str(first.returningOfficer),
+      day: str(first.day),
+      month: monthVal,
+      year: str(first.year),
+    });
+    setPositions(buildPositionsFromRows(rows));
+    setOriginalElectionName(str(first.electionName).trim());
+    setEditMode(true);
+    setShowExisting(false);
   };
 
   const addPosition = () => {
-    setPositions(prev => [...prev, {
-      position: '', rejectedBallots: '', totalVotesCast: '',
-      candidates: [{ candidateName: '', votes: '', ron: '', outcome: 'No Winner' }],
-    }]);
+    setPositions((prev) => [...prev, defaultPositionBlock()]);
   };
 
   const removePosition = (pi: number) => {
-    setPositions(prev => prev.filter((_, i) => i !== pi));
+    setPositions((prev) => prev.filter((_, i) => i !== pi));
   };
 
   const updatePosition = (pi: number, field: string, value: string) => {
-    setPositions(prev => prev.map((p, i) => i === pi ? { ...p, [field]: value } : p));
+    setPositions((prev) => prev.map((p, i) => (i === pi ? { ...p, [field]: value } : p)));
   };
 
   const addCandidate = (pi: number) => {
-    setPositions(prev => prev.map((p, i) => i === pi ? { ...p, candidates: [...p.candidates, { candidateName: '', votes: '', ron: '', outcome: 'No Winner' }] } : p));
+    setPositions((prev) =>
+      prev.map((p, i) =>
+        i === pi
+          ? { ...p, candidates: [...p.candidates, { candidateName: '', votes: '', ron: '', outcome: 'No Winner' }] }
+          : p
+      )
+    );
   };
 
   const removeCandidate = (pi: number, ci: number) => {
-    setPositions(prev => prev.map((p, i) => i === pi ? { ...p, candidates: p.candidates.filter((_, j) => j !== ci) } : p));
+    setPositions((prev) =>
+      prev.map((p, i) => (i === pi ? { ...p, candidates: p.candidates.filter((_, j) => j !== ci) } : p))
+    );
   };
 
   const updateCandidate = (pi: number, ci: number, field: string, value: string) => {
-    setPositions(prev => prev.map((p, i) => i === pi ? {
-      ...p,
-      candidates: p.candidates.map((c, j) => j === ci ? { ...c, [field]: value } : c),
-    } : p));
+    setPositions((prev) =>
+      prev.map((p, i) =>
+        i === pi
+          ? {
+              ...p,
+              candidates: p.candidates.map((c, j) => (j === ci ? { ...c, [field]: value } : c)),
+            }
+          : p
+      )
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    let allOk = true;
+    setStatus('idle');
 
+    if (editMode) {
+      const ok = await submitForm(
+        'past_result',
+        {
+          originalElectionName,
+          electionName: electionInfo.electionName,
+          returningOfficer: electionInfo.returningOfficer,
+          day: electionInfo.day,
+          month: electionInfo.month,
+          year: electionInfo.year,
+          positions: positions.map((p) => ({
+            position: p.position,
+            rejectedBallots: p.rejectedBallots,
+            totalVotesCast: p.totalVotesCast,
+            candidates: p.candidates,
+          })),
+        },
+        'update'
+      );
+      setStatus(ok ? 'success' : 'error');
+      if (ok) {
+        cancelEdit();
+        setTimeout(() => setStatus('idle'), 5000);
+      }
+      setIsSubmitting(false);
+      return;
+    }
+
+    let allOk = true;
     for (const pos of positions) {
       for (const cand of pos.candidates) {
         const row = {
@@ -548,32 +685,103 @@ function PastResultsSection() {
           totalVotesCast: pos.totalVotesCast,
           ...cand,
         };
-        const ok = await submitForm('past_result', row);
+        const ok = await submitForm('past_result', row, 'create');
         if (!ok) allOk = false;
       }
     }
 
     setStatus(allOk ? 'success' : 'error');
     if (allOk) {
-      setElectionInfo({ returningOfficer: '', day: '', month: '', year: '' });
-      setPositions([{ position: '', rejectedBallots: '', totalVotesCast: '', candidates: [{ candidateName: '', votes: '', ron: '', outcome: 'No Winner' }] }]);
+      setElectionInfo(emptyElection);
+      setPositions([defaultPositionBlock()]);
       setTimeout(() => setStatus('idle'), 5000);
     }
     setIsSubmitting(false);
   };
 
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-white mb-1 font-serif">Past Election Results</h2>
-        <p className="text-gray-400 text-sm">Record a full election period with all positions and candidates.</p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-1 font-serif">{editMode ? 'Edit Past Election Results' : 'Past Election Results'}</h2>
+          <p className="text-gray-400 text-sm">
+            {editMode
+              ? 'Update every position and candidate for this election period, then save. Make.com should search rows where the Election name column matches originalElectionName, then replace them with the new data.'
+              : 'Record a full election period with all positions and candidates.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {editMode && (
+            <button type="button" onClick={cancelEdit} className="flex items-center px-3 py-2 text-sm bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors font-medium">
+              <X className="w-4 h-4 mr-1" /> Cancel Edit
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setShowExisting(!showExisting);
+              if (!showExisting) loadExisting();
+            }}
+            className="flex items-center px-3 py-2 text-sm bg-guild-yellow/10 hover:bg-guild-yellow/20 text-guild-yellow border border-guild-yellow/30 rounded-lg transition-colors font-medium"
+          >
+            <Pencil className="w-4 h-4 mr-1" /> {showExisting ? 'Hide Existing' : 'View / Edit Existing'}
+          </button>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {showExisting && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="border border-gray-700 rounded-xl p-4 space-y-3 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-bold text-gray-300">Saved Election Periods</p>
+                <button type="button" onClick={loadExisting} className="text-xs text-gray-400 hover:text-white flex items-center">
+                  <RefreshCw className={`w-3 h-3 mr-1 ${loadingExisting ? 'animate-spin' : ''}`} /> Refresh
+                </button>
+              </div>
+              {loadingExisting ? (
+                <p className="text-sm text-gray-500 py-4 text-center">Loading...</p>
+              ) : existingGroups.length === 0 ? (
+                <p className="text-sm text-gray-500 py-4 text-center">No past results found.</p>
+              ) : (
+                existingGroups.map((g) => (
+                  <div key={g.key} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700/50 gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{g.label}</p>
+                      {g.subtitle && <p className="text-gray-500 text-xs truncate">{g.subtitle}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(g.rows)}
+                      className="flex items-center px-3 py-1.5 text-xs bg-guild-red/10 hover:bg-guild-red/20 text-guild-red border border-guild-red/30 rounded-lg font-bold transition-colors shrink-0"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" /> Edit
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Election Period Info */}
       <div className="p-6 border-2 border-guild-yellow/30 bg-guild-yellow/5 rounded-xl space-y-4">
         <p className="text-sm font-bold text-guild-yellow uppercase tracking-wider">Election Period Details</p>
+        <FormField label="Election name" required>
+          <input
+            required
+            value={electionInfo.electionName}
+            onChange={(e) => updateElection('electionName', e.target.value)}
+            className={inputClass}
+            placeholder="e.g., Contingent Presidential Election 2026"
+          />
+        </FormField>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField label="Returning Officer" required>
             <input required value={electionInfo.returningOfficer} onChange={e => updateElection('returningOfficer', e.target.value)} className={inputClass} placeholder="e.g., Dr. Jane Smith" />
@@ -659,9 +867,9 @@ function PastResultsSection() {
         <Plus className="w-4 h-4 mr-1" /> Add Another Position
       </button>
 
-      <StatusBanner status={status} successMsg="Past election results saved!" />
+      <StatusBanner status={status} successMsg={editMode ? 'Past election results updated!' : 'Past election results saved!'} />
       <button type="submit" disabled={isSubmitting} className={`w-full p-4 rounded-xl font-bold text-white transition-all ${isSubmitting ? 'bg-gray-700 cursor-not-allowed text-gray-400' : 'bg-gradient-to-r from-guild-red to-red-800 hover:shadow-lg hover:shadow-red-500/30'}`}>
-        {isSubmitting ? 'Saving...' : 'Save Election Results'}
+        {isSubmitting ? 'Saving...' : editMode ? 'Update Election Results' : 'Save Election Results'}
       </button>
     </form>
   );
@@ -886,14 +1094,14 @@ function AboutSection() {
 // SECTION: Councilor Roles Form (with Edit)
 // ═══════════════════════════════════════════════════════════
 function CouncilorRolesSection() {
-  const emptyForm = { position: '', constitutionalDuties: '', additionalExpectations: '', candidateGuidance: '', order: '0' };
+  const emptyForm = { position: '', constitutionalDuties: '', additionalExpectations: '', candidateGuidance: '', order: '0', seatType: 'elected' as 'elected' | 'appointed' };
   const [form, setForm] = useState(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [editMode, setEditMode] = useState(false);
   const [editKey, setEditKey] = useState('');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -914,15 +1122,25 @@ function CouncilorRolesSection() {
         <EditPanel<Record<string, string>>
           dataType="councilor_roles"
           renderItem={(item) => (
-            <div><p className="text-white font-semibold text-sm">{item.position}</p><p className="text-gray-400 text-xs">Order: {item.order}</p></div>
+            <div>
+              <p className="text-white font-semibold text-sm">{item.position}</p>
+              <p className="text-gray-400 text-xs">
+                Order: {item.order}
+                {item.seatType && (
+                  <span className="ml-2 text-guild-yellow/90">· {item.seatType === 'appointed' ? 'Appointed' : 'Elected'}</span>
+                )}
+              </p>
+            </div>
           )}
           onEdit={(item) => {
+            const seat = item.seatType === 'appointed' ? 'appointed' : 'elected';
             setForm({
               position: item.position || '',
               constitutionalDuties: Array.isArray(item.constitutionalDuties) ? item.constitutionalDuties.join(' | ') : (item.constitutionalDuties || ''),
               additionalExpectations: Array.isArray(item.additionalExpectations) ? item.additionalExpectations.join(' | ') : (item.additionalExpectations || ''),
               candidateGuidance: item.candidateGuidance || '',
-              order: item.order || '0',
+              order: String(item.order ?? '0'),
+              seatType: seat,
             });
             setEditMode(true); setEditKey(item.position || '');
           }}
@@ -938,6 +1156,12 @@ function CouncilorRolesSection() {
             <input name="order" type="number" value={form.order} onChange={handleChange} className={inputClass} placeholder="0" />
           </FormField>
         </div>
+        <FormField label="Guild council seat" required>
+          <select required name="seatType" value={form.seatType} onChange={handleChange} className={selectClass}>
+            <option value="elected">Elected</option>
+            <option value="appointed">Appointed</option>
+          </select>
+        </FormField>
         <FormField label="Constitutional Duties (separate with |)" required>
           <textarea required name="constitutionalDuties" value={form.constitutionalDuties} onChange={handleChange} rows={4} className={textareaClass} placeholder="Chair Guild meetings | Represent students at University Council | Oversee Guild budget" />
         </FormField>
@@ -960,9 +1184,17 @@ function CouncilorRolesSection() {
 // ═══════════════════════════════════════════════════════════
 // SECTION: Records / Officials Form (with Edit)
 // ═══════════════════════════════════════════════════════════
+type OfficialFormState = {
+  name: string;
+  role: string;
+  yearStart: string;
+  yearEnd: string;
+  officialType: 'returning_officer' | 'geo_official' | 'councilor';
+};
+
 function RecordsSection() {
-  const emptyForm = { name: '', role: '', yearStart: '', yearEnd: '', officialType: 'geo_official' };
-  const [form, setForm] = useState(emptyForm);
+  const emptyForm: OfficialFormState = { name: '', role: '', yearStart: '', yearEnd: '', officialType: 'geo_official' };
+  const [form, setForm] = useState<OfficialFormState>(emptyForm);
   const [photoUrl, setPhotoUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -993,7 +1225,14 @@ function RecordsSection() {
             <div><p className="text-white font-semibold text-sm">{item.name}</p><p className="text-gray-400 text-xs">{item.role} &middot; {item.yearStart}{item.yearEnd ? `–${item.yearEnd}` : ''}</p></div>
           )}
           onEdit={(item) => {
-            setForm({ name: item.name || '', role: item.role || '', yearStart: item.yearStart || '', yearEnd: item.yearEnd || '', officialType: item.type || 'geo_official' });
+            const otype = (item.type || 'geo_official') as OfficialFormState['officialType'];
+            setForm({
+              name: item.name || '',
+              role: item.role || '',
+              yearStart: item.yearStart || '',
+              yearEnd: item.yearEnd || '',
+              officialType: otype,
+            });
             setPhotoUrl(item.photoUrl || '');
             setEditMode(true); setEditKey(item.name || '');
           }}
