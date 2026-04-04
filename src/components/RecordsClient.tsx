@@ -9,7 +9,6 @@ import {
   UserCheck,
   User,
   Inbox,
-  Clock,
   Calendar,
 } from "lucide-react";
 import { Official } from "@/lib/googleSheets";
@@ -48,6 +47,29 @@ const emptyLabels: Record<Tab, string> = {
   geo_official: "GEO Official",
   councilor: "Former Councilor",
 };
+
+/** First 4-digit year in a cell (handles stray spaces or extra text). */
+function parseRecordYear(s: string | undefined): number {
+  if (s == null || String(s).trim() === "") return Number.NEGATIVE_INFINITY;
+  const m = String(s).trim().match(/\d{4}/);
+  return m ? parseInt(m[0], 10) : Number.NEGATIVE_INFINITY;
+}
+
+/**
+ * Sheet order is arbitrary. Sort by tenure: most recent start year first,
+ * then end year (treat open-ended / Present as latest), then name.
+ */
+function sortOfficialsByTenureDesc(list: Official[]): Official[] {
+  return [...list].sort((a, b) => {
+    const startA = parseRecordYear(a.yearStart);
+    const startB = parseRecordYear(b.yearStart);
+    if (startB !== startA) return startB - startA;
+    const endA = a.yearEnd?.trim() ? parseRecordYear(a.yearEnd) : 9999;
+    const endB = b.yearEnd?.trim() ? parseRecordYear(b.yearEnd) : 9999;
+    if (endB !== endA) return endB - endA;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+}
 
 function YearBadge({ start, end }: { start: string; end: string }) {
   return (
@@ -242,10 +264,10 @@ function EmptyState({ type }: { type: Tab }) {
 export default function RecordsClient({ officials }: RecordsClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("returning_officer");
 
-  const filtered = useMemo(
-    () => officials.filter((o) => o.type === activeTab),
-    [officials, activeTab]
-  );
+  const filtered = useMemo(() => {
+    const list = officials.filter((o) => o.type === activeTab);
+    return sortOfficialsByTenureDesc(list);
+  }, [officials, activeTab]);
 
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 relative z-10">
