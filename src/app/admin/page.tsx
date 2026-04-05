@@ -546,8 +546,10 @@ function PastResultsSection() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [editMode, setEditMode] = useState(false);
-  /** Election name (column A) as it was when Edit was opened — send to Make as `originalElectionName` to find rows to replace. */
+  /** Original header values captured at edit-open time — sent to Make so it can locate the rows to replace. */
   const [originalElectionName, setOriginalElectionName] = useState('');
+  const [originalYear, setOriginalYear] = useState('');
+  const [originalReturningOfficer, setOriginalReturningOfficer] = useState('');
   const [showExisting, setShowExisting] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [existingGroups, setExistingGroups] = useState<
@@ -579,6 +581,8 @@ function PastResultsSection() {
   const cancelEdit = () => {
     setEditMode(false);
     setOriginalElectionName('');
+    setOriginalYear('');
+    setOriginalReturningOfficer('');
     setElectionInfo(emptyElection);
     setPositions([defaultPositionBlock()]);
   };
@@ -597,6 +601,8 @@ function PastResultsSection() {
     });
     setPositions(buildPositionsFromRows(rows));
     setOriginalElectionName(str(first.electionName).trim());
+    setOriginalYear(str(first.year).trim());
+    setOriginalReturningOfficer(str(first.returningOfficer).trim());
     setEditMode(true);
     setShowExisting(false);
   };
@@ -652,6 +658,8 @@ function PastResultsSection() {
         'past_result',
         {
           originalElectionName,
+          originalYear,
+          originalReturningOfficer,
           electionName: electionInfo.electionName,
           returningOfficer: electionInfo.returningOfficer,
           day: electionInfo.day,
