@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { DynamicBackground } from "@/components/DynamicBackground";
 import Link from "next/link";
 import { Lock } from "lucide-react";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,7 @@ export default function RootLayout({
             <Lock className="w-3 h-3 mr-1.5" /> Admin Portal
           </Link>
         </footer>
+        <Analytics />
       </body>
     </html>
   );
