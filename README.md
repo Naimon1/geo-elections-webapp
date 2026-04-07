@@ -26,9 +26,15 @@ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_upload_preset
 # Make.com Webhook
 MAKE_WEBHOOK_URL=your_make_webhook_url
 
-# Admin Authentication
-NEXT_PUBLIC_ADMIN_PASSWORD=your_secure_password
+# Admin (server-only — never use NEXT_PUBLIC_ for passwords)
+ADMIN_PASSWORD=your_secure_passphrase
+# Min 16 characters; used to sign the HttpOnly admin session cookie
+ADMIN_SESSION_SECRET=your_long_random_secret_at_least_16_chars
 ```
+
+In development, if `ADMIN_SESSION_SECRET` is omitted, a deterministic dev-only secret is derived from `ADMIN_PASSWORD` so local login still works. **Production must set `ADMIN_SESSION_SECRET` explicitly.**
+
+Rate limiting (login, submit, data) uses an in-memory store per server instance. On serverless with many instances, limits are approximate; use a shared store (e.g. Redis) if you need strict global limits.
 
 ### 2. Google Sheets Setup
 Create a Google Sheet with three tabs:

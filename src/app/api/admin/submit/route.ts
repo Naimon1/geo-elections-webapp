@@ -1,4 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { ADMIN_SESSION_COOKIE, verifyAdminSessionToken } from "@/lib/adminSession";
+import { getClientIp, rateLimit } from "@/lib/rateLimit";
+
+const SUBMIT_WINDOW_MS = 60 * 60 * 1000;
+const SUBMIT_MAX = 60;
 
 const VALID_TYPES = [
   'candidate',
@@ -13,6 +19,17 @@ const VALID_TYPES = [
 ] as const;
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  if (!rateLimit(`admin:submit:${ip}`, SUBMIT_MAX, SUBMIT_WINDOW_MS)) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!token || !verifyAdminSessionToken(token)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const data = await request.json();
     const { type, action, ...payload } = data;

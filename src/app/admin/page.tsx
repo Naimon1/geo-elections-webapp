@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { setAdminUnauthorizedListener, notifyAdminUnauthorized } from '@/lib/adminClientAuth';
 import { pastElectionGroupingKey, type PastElectionResult } from '@/lib/googleSheets';
 import { FileUpload } from '@/components/FileUpload';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,9 +56,14 @@ async function submitForm(type: string, payload: Record<string, unknown>, action
   try {
     const response = await fetch('/api/admin/submit', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, action, ...payload }),
     });
+    if (response.status === 401) {
+      notifyAdminUnauthorized();
+      return false;
+    }
     return response.ok;
   } catch {
     return false;
@@ -69,7 +75,12 @@ async function fetchExistingData(dataType: string) {
   try {
     const response = await fetch(`/api/admin/data?type=${dataType}`, {
       cache: 'no-store',
+      credentials: 'include',
     });
+    if (response.status === 401) {
+      notifyAdminUnauthorized();
+      return [];
+    }
     if (!response.ok) return [];
     const result = await response.json();
     return result.data || [];
@@ -1378,37 +1389,82 @@ function TabContent({ tab }: { tab: AdminTab }) {
 // MAIN ADMIN PORTAL
 // ═══════════════════════════════════════════════════════════
 export default function AdminPortal() {
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState(false);
+  const [loginErrorText, setLoginErrorText] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('candidates');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/session', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled && d.authenticated) setIsAuthenticated(true);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setSessionChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setAdminUnauthorizedListener(() => setIsAuthenticated(false));
+    return () => setAdminUnauthorizedListener(null);
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
-    setLoginError(false);
+    setLoginErrorText('');
     try {
       const response = await fetch('/api/admin/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
       const data = await response.json();
-      if (data.authenticated) {
+      if (response.ok && data.authenticated) {
         setIsAuthenticated(true);
-      } else {
-        setLoginError(true);
-        setTimeout(() => setLoginError(false), 3000);
+        return;
       }
+      if (response.status === 429) {
+        setLoginErrorText(typeof data.error === 'string' ? data.error : 'Too many attempts. Try again later.');
+      } else if (response.status >= 500) {
+        setLoginErrorText(typeof data.error === 'string' ? data.error : 'Server error. Try again later.');
+      } else {
+        setLoginErrorText('Incorrect passphrase. Access denied.');
+      }
+      setTimeout(() => setLoginErrorText(''), 5000);
     } catch {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 3000);
+      setLoginErrorText('Could not reach the server. Try again.');
+      setTimeout(() => setLoginErrorText(''), 5000);
     } finally {
       setIsLoggingIn(false);
     }
   };
+
+  const handleLock = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST', credentials: 'include' });
+    } finally {
+      setIsAuthenticated(false);
+    }
+  };
+
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center relative z-10">
+        <div className="w-10 h-10 border-2 border-guild-yellow border-t-transparent rounded-full animate-spin" aria-label="Loading" />
+      </div>
+    );
+  }
 
   // ─── Login Screen ────────────────────────────────────
   if (!isAuthenticated) {
@@ -1437,12 +1493,12 @@ export default function AdminPortal() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter passphrase"
-                className={`w-full p-4 pl-5 bg-gray-900/50 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-guild-red/20 transition-all font-medium backdrop-blur-sm text-white ${loginError ? 'border-red-500 text-red-400' : 'border-gray-700 focus:border-guild-red'}`}
+                className={`w-full p-4 pl-5 bg-gray-900/50 border-2 rounded-xl focus:outline-none focus:ring-4 focus:ring-guild-red/20 transition-all font-medium backdrop-blur-sm text-white ${loginErrorText ? 'border-red-500 text-red-400' : 'border-gray-700 focus:border-guild-red'}`}
               />
               <AnimatePresence>
-                {loginError && (
+                {loginErrorText && (
                   <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-red-500 text-sm mt-2 font-medium">
-                    Incorrect passphrase. Access denied.
+                    {loginErrorText}
                   </motion.p>
                 )}
               </AnimatePresence>
@@ -1483,7 +1539,7 @@ export default function AdminPortal() {
               <p className="text-gray-400 text-xs font-medium hidden sm:block">Guild Elections Office Administration</p>
             </div>
           </div>
-          <button onClick={() => setIsAuthenticated(false)} className="flex items-center px-3 py-2 bg-gray-800/50 hover:bg-red-900/30 text-gray-300 hover:text-guild-red rounded-lg transition-colors font-semibold text-sm border border-gray-700">
+          <button type="button" onClick={handleLock} className="flex items-center px-3 py-2 bg-gray-800/50 hover:bg-red-900/30 text-gray-300 hover:text-guild-red rounded-lg transition-colors font-semibold text-sm border border-gray-700">
             <LogOut className="w-4 h-4 mr-1.5" /> Lock
           </button>
         </div>
